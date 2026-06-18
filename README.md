@@ -32,7 +32,7 @@ Because NetDefender scans raw network packets, it **must be run locally** on you
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/yourusername/NetDefender.git
+   git clone https://github.com/adimalpani99/NetDefender.git
    cd NetDefender
    ```
 
