@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Private WiFi Network Scanner</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- SweetAlert2 for nice popups -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 4px solid #3498db;
+            width: 40px;
+            height: 40px;
+            -webkit-animation: spin 1s linear infinite; /* Safari */
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen p-8">
+    <div class="max-w-4xl mx-auto bg-white rounded-lg shadow-lg p-6">
+        <div class="flex justify-between items-center mb-6 border-b pb-4">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-800">WiFi Defense Scanner</h1>
+                <p class="text-gray-500 mt-1" id="network-info">Click scan to check your network.</p>
+            </div>
+            <button id="scan-btn" onclick="startScan()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg transition duration-200 shadow-md">
+                Scan Network
+            </button>
+        </div>
+
+        <div id="loading" class="hidden flex-col items-center justify-center py-12">
+            <div class="loader mb-4"></div>
+            <p class="text-gray-600 font-semibold">Scanning local network using ARP... This takes a few seconds.</p>
+        </div>
+
+        <div id="results" class="hidden">
+            <table class="min-w-full leading-normal">
+                <thead>
+                    <tr>
+                        <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Device / Vendor</th>
+                        <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">IP Address</th>
+                        <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">MAC Address</th>
+                        <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="device-list">
+                    <!-- Devices injected here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let currentRouterIp = "192.168.1.1";
+
+        async function startScan() {
+            document.getElementById('scan-btn').disabled = true;
+            document.getElementById('scan-btn').innerText = "Scanning...";
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('results').classList.add('hidden');
+            document.getElementById('device-list').innerHTML = '';
+            
+            try {
+                const response = await fetch('/api/scan');
+                const data = await response.json();
+                
+                if (data.error) {
+                    Swal.fire('Error', data.error, 'error');
+                    return;
+                }
+
+                currentRouterIp = data.router_ip;
+                document.getElementById('network-info').innerText = `Scanned Subnet: ${data.subnet} | Router: ${data.router_ip}`;
+                
+                const tbody = document.getElementById('device-list');
+                data.devices.forEach(device => {
+                    let badge = '';
+                    if (device.is_router) badge = '<span class="ml-2 px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">Router</span>';
+                    
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                            <p class="text-gray-900 font-bold">${device.vendor} ${badge}</p>
+                        </td>
+                        <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                            <p class="text-gray-900">${device.ip}</p>
+                        </td>
+                        <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm font-mono">
+                            <p class="text-gray-900">${device.mac}</p>
+                        </td>
+                        <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+                            ${!device.is_router ? `<button onclick="showRemoveInstructions('${device.mac}', '${device.ip}', '${device.vendor}')" class="text-red-600 hover:text-red-900 font-semibold bg-red-100 px-3 py-1 rounded">Remove / Block</button>` : '<span class="text-gray-400">Cannot block router</span>'}
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
+
+                document.getElementById('results').classList.remove('hidden');
+                
+            } catch (error) {
+                Swal.fire('Network Error', 'Could not reach the local server. Is app.py running?', 'error');
+            } finally {
+                document.getElementById('scan-btn').disabled = false;
+                document.getElementById('scan-btn').innerText = "Scan Network";
+                document.getElementById('loading').classList.add('hidden');
+            }
+        }
+
+        function showRemoveInstructions(mac, ip, vendor) {
+            Swal.fire({
+                title: 'Block Unauthorized Device',
+                icon: 'warning',
+                html: `
+                    <div class="text-left mt-2 space-y-3">
+                        <p>To securely and permanently remove this <strong>${vendor}</strong> device from your network, you need to add its MAC Address to your Router's Blocklist (MAC Filtering).</p>
+                        
+                        <div class="bg-gray-100 p-3 rounded font-mono text-center text-lg shadow-inner">
+                            Target MAC: <strong>${mac}</strong>
+                        </div>
+
+                        <h3 class="font-bold text-gray-800 mt-4">One-Click Action:</h3>
+                        <p class="text-sm">Click the button below to open your router's admin gateway. Once logged in:</p>
+                        <ol class="list-decimal pl-5 text-sm space-y-1 mt-1 text-gray-700">
+                            <li>Find the <strong>Wireless</strong> or <strong>Security</strong> settings.</li>
+                            <li>Look for <strong>MAC Filtering</strong> or <strong>Access Control</strong>.</li>
+                            <li>Add <code>${mac}</code> to the "Deny" or "Block" list and save.</li>
+                        </ol>
+                    </div>
+                `,
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#3085d6',
+                confirmButtonText: 'Open Router Admin Page',
+                cancelButtonText: 'Cancel'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // Try to open the router's IP in a new tab
+                    window.open(`http://${currentRouterIp}`, '_blank');
+                }
+            })
+        }
+    </script>
+</body>
+</html>
