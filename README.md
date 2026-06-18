@@ -10,8 +10,6 @@
 
 [Features](#-features) • [Installation](#-installation) • [How it Works](#-how-it-works) • [Contributing](#-contributing)
 
-*(Note to publisher: Insert a GIF or screenshot of the web UI here!)*
-`![Screenshot](link-to-your-screenshot.png)`
 
 </div>
 
